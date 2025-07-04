@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <title>덧셈/뺄셈 트레이너</title>
+  <style>
+    * {
+      box-sizing: border-box;
+    }
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background: linear-gradient(to bottom, #f7f8fc, #e4e9f0);
+      text-align: center;
+      margin: 0;
+      padding: 3em 1em;
+      color: #333;
+    }
+    .top-bar {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      gap: 2em;
+      font-size: 1.5em;
+      margin-bottom: 2em;
+    }
+    button {
+      font-size: 1.2em;
+      padding: 0.5em 1.2em;
+      border: none;
+      border-radius: 8px;
+      background-color: #4a90e2;
+      color: white;
+      cursor: pointer;
+      transition: background-color 0.2s;
+    }
+    button:hover {
+      background-color: #357ab8;
+    }
+    #timer, #counter {
+      padding: 0.3em 1em;
+      background-color: white;
+      border-radius: 6px;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.1);
+      min-width: 120px;
+    }
+    .expression {
+      font-size: 8em;
+      font-weight: bold;
+      color: #222;
+      margin: 1em 0;
+      visibility: hidden;
+    }
+    .message {
+      font-size: 1.5em;
+      color: #888;
+      margin-top: 1em;
+    }
+  </style>
+</head>
+<body>
+  <div class="top-bar">
+    <button id="toggleBtn">+</button>
+    <div id="timer">00:00.000</div>
+    <div id="counter">0</div>
+  </div>
+  <div class="expression" id="expression">1 + 2</div>
+  <div class="message" id="message">시작하려면 스페이스바를 누르세요</div>
+
+  <script>
+    let isAddition = true;
+    let count = 0;
+    let startTime = null;
+    let intervalId = null;
+    let started = false;
+
+    const expressionEl = document.getElementById('expression');
+    const toggleBtn = document.getElementById('toggleBtn');
+    const timerEl = document.getElementById('timer');
+    const counterEl = document.getElementById('counter');
+    const messageEl = document.getElementById('message');
+
+    // 문제 세트 관련 변수
+    const SET_SIZE = 5; // 한 번에 유지할 문제 개수
+    const MAX_REPEAT = 4; // 한 문제당 반복 노출 횟수
+    const TOTAL_COUNT = 100; // 전체 문제 수
+    let currentSet = [];
+    let shownCount = new Map(); // 각 수식별 노출 횟수
+    let usedExpressions = new Set(); // 이미 출제된 수식
+
+function reset() {
+  count = 0;
+  started = false;
+  startTime = null;
+  clearInterval(intervalId);
+  timerEl.textContent = '00:00.000';
+  counterEl.textContent = '0';
+  expressionEl.style.visibility = 'hidden';
+  messageEl.textContent = '시작하려면 스페이스바를 누르세요';
+  currentSet = [];
+  shownCount = new Map();
+  usedExpressions = new Set();
+  lastExprKey = null;
+  generateInitialSet();
+}
+
+    function randomDigit() {
+      return Math.floor(Math.random() * 9) + 1;
+    }
+
+    function generateExpression() {
+      let a = randomDigit();
+      let b = randomDigit();
+      if (!isAddition && a < b) {
+        [a, b] = [b, a];
+      }
+      return { a, b, op: isAddition ? '+' : '-' };
+    }
+
+    function expressionToString(expr) {
+      return `${expr.a} ${expr.op} ${expr.b}`;
+    }
+
+    function generateUniqueExpression() {
+      let expr, key, tries = 0;
+      do {
+        expr = generateExpression();
+        key = expressionToString(expr);
+        tries++;
+        if (tries > 100) break; // 무한루프 방지
+      } while (usedExpressions.has(key) || currentSet.some(e => expressionToString(e) === key));
+      usedExpressions.add(key);
+      return expr;
+    }
+
+    function generateInitialSet() {
+      for (let i = 0; i < SET_SIZE; i++) {
+        const expr = generateUniqueExpression();
+        currentSet.push(expr);
+        shownCount.set(expressionToString(expr), 0);
+      }
+    }
+
+    let lastExprKey = null;
+    function pickNextExpression() {
+      // 직전과 같은 수식이 나오지 않도록 랜덤 선택
+      if (currentSet.length === 1) {
+        return currentSet[0];
+      }
+      let idx, expr, key, tries = 0;
+      do {
+        idx = Math.floor(Math.random() * currentSet.length);
+        expr = currentSet[idx];
+        key = expressionToString(expr);
+        tries++;
+        if (tries > 20) break; // 무한루프 방지
+      } while (key === lastExprKey);
+      lastExprKey = key;
+      return expr;
+    }
+
+    function updateExpression() {
+      // 다음에 보여줄 수식 선택
+      let expr = pickNextExpression();
+      expressionEl.textContent = expressionToString(expr);
+      // 노출 횟수 증가
+      const key = expressionToString(expr);
+      shownCount.set(key, shownCount.get(key) + 1);
+      // MAX_REPEAT만큼 노출된 수식은 교체
+      if (shownCount.get(key) >= MAX_REPEAT) {
+        // currentSet에서 제거
+        currentSet = currentSet.filter(e => expressionToString(e) !== key);
+        shownCount.delete(key);
+        // 새 수식 추가 (기존에 없던 것)
+        const newExpr = generateUniqueExpression();
+        currentSet.push(newExpr);
+        shownCount.set(expressionToString(newExpr), 0);
+      }
+    }
+
+    function updateTimer() {
+      if (!started || startTime === null) return;
+      const now = Date.now();
+      const elapsed = now - startTime;
+      const minutes = String(Math.floor(elapsed / 60000)).padStart(2, '0');
+      const seconds = String(Math.floor((elapsed % 60000) / 1000)).padStart(2, '0');
+      const milliseconds = String(elapsed % 1000).padStart(3, '0');
+      timerEl.textContent = `${minutes}:${seconds}.${milliseconds}`;
+    }
+
+toggleBtn.addEventListener('click', () => {
+  isAddition = !isAddition;
+  toggleBtn.textContent = isAddition ? '+' : '-';
+  lastExprKey = null;
+  reset();
+});
+
+    function handleAction() {
+      if (!started) {
+        started = true;
+        startTime = Date.now();
+        intervalId = setInterval(updateTimer, 31);
+        expressionEl.style.visibility = 'visible';
+        messageEl.textContent = '';
+        updateExpression();
+        return;
+      }
+
+      if (count < TOTAL_COUNT) {
+        count++;
+        counterEl.textContent = count;
+        updateExpression();
+        if (count === TOTAL_COUNT) {
+          clearInterval(intervalId);
+        }
+      }
+    }
+
+    document.addEventListener('keydown', (e) => {
+      if (e.code === 'Space') {
+        e.preventDefault();
+        handleAction();
+      }
+    });
+
+// 클릭 이벤트에서 토글 버튼 클릭은 무시
+document.addEventListener('click', (e) => {
+  // 토글 버튼 클릭 시에는 handleAction 실행하지 않음
+  if (e.target === toggleBtn) return;
+  handleAction();
+});
+
+    // 초기 설정
+    reset();
+  </script>
+</body>
+</html>
