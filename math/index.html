@@ -10,10 +10,18 @@
     body {
       font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
       background: linear-gradient(to bottom, #f7f8fc, #e4e9f0);
-      text-align: center;
+      min-height: 100vh;
+      width: 100vw;
       margin: 0;
-      padding: 3em 1em;
+      padding: 0;
       color: #333;
+    }
+    .center-container {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 100%;
     }
     .top-bar {
       display: flex;
@@ -21,160 +29,267 @@
       align-items: center;
       gap: 2em;
       font-size: 1.5em;
-      margin-bottom: 2em;
+      margin-bottom: 1em;
     }
-    button {
-      font-size: 1.2em;
-      padding: 0.5em 1.2em;
+    .top-bar button {
+      font-size: 1em;
+      padding: 0.4em 1em;
       border: none;
       border-radius: 8px;
       background-color: #4a90e2;
       color: white;
       cursor: pointer;
       transition: background-color 0.2s;
+      height: 48px;
+      min-width: 48px;
+      line-height: 1.2;
     }
-    button:hover {
+    .top-bar button:hover {
       background-color: #357ab8;
     }
     #timer, #counter {
-      padding: 0.3em 1em;
+      padding: 0.4em 1em;
       background-color: white;
-      border-radius: 6px;
+      border-radius: 8px;
       box-shadow: 0 1px 4px rgba(0,0,0,0.1);
       min-width: 120px;
+      font-size: 1em;
+      text-align: center;
+      margin: 0 0.5em;
+      height: 48px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .pool-count-box {
+      background: #fff;
+      border-radius: 8px;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.1);
+      min-width: 180px;
+      padding: 0.4em 1em;
+      font-size: 1em;
+      text-align: center;
+      margin: 0 0.5em;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      height: 48px;
     }
     .expression {
       font-size: 8em;
       font-weight: bold;
       color: #222;
       margin: 1em 0;
-      visibility: hidden;
+      min-height: 1em;
+      transition: opacity 0.2s;
+      opacity: 1;
     }
     .message {
       font-size: 1.5em;
       color: #888;
       margin-top: 1em;
+      text-align: center;
+    }
+    #center-message {
+      text-align: center;
+      font-size: 2em;
+      color: #357ab8;
+      margin-top: 0.em;
+      min-height: 1.5em;
+      transition: opacity 0.2s;
+      opacity: 1;
     }
   </style>
 </head>
-<body>
-  <div class="top-bar">
-    <button id="toggleBtn">+</button>
-    <div id="timer">00:00.000</div>
-    <div id="counter">0</div>
+<body style="margin:0; padding:0; min-height:100vh;">
+  <div id="circle-bg" style="position: fixed; left: 50%; top: 50%; transform: translate(-50%, -50%); background: #b3d4fc; border-radius: 50%; z-index: -1; width: 0vw; height: 0vw; pointer-events: none; transition: width 0s, height 0s;"></div>
+  <div id="main-content" style="display:none;">
+    <div class="center-container" style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 100%; max-width: 700px;">
+      <div class="top-bar">
+        <button id="toggleBtn">+</button>
+        <div id="timer">00:00.000</div>
+        <div id="pool-counts" style="display: flex; gap: 2em; justify-content: center;">
+          <div id="pool1-count" class="pool-count-box">대기: 0</div>
+          <div id="pool3-count" class="pool-count-box">완료: 0</div>
+        </div>
+      </div>
+      <div class="center-flex" style="display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 320px; gap: 0.5em;">
+        <div class="expression" id="expression" style="visibility: visible; min-height: 1em;">1 + 2</div>
+        <div id="center-message" style="text-align:center; font-size:2em; color:#357ab8; min-height: 1.5em;"></div>
+      </div>
+      <div id="choices" style="display: flex; justify-content: center; gap: 2em; margin: 2em 0;"></div>
+    </div>
   </div>
-  <div class="expression" id="expression">1 + 2</div>
-  <div class="message" id="message">시작하려면 스페이스바를 누르세요</div>
+  <div class="message" id="message" style="text-align:center; font-size:1.5em; color:#888; margin-top:1em;">시작하려면 스페이스바를 누르세요</div>
 
   <script>
+    // 3개의 풀
+    const SET_SIZE = 5;
     let isAddition = true;
     let count = 0;
     let startTime = null;
     let intervalId = null;
     let started = false;
+    let pool1 = [];
+    let pool2 = [];
+    let pool3 = [];
+    let currentIdx = 0;
 
     const expressionEl = document.getElementById('expression');
     const toggleBtn = document.getElementById('toggleBtn');
     const timerEl = document.getElementById('timer');
-    const counterEl = document.getElementById('counter');
+    const pool1CountEl = document.getElementById('pool1-count');
+    const pool3CountEl = document.getElementById('pool3-count');
     const messageEl = document.getElementById('message');
+    const choicesEl = document.getElementById('choices');
+    const circleBgEl = document.getElementById('circle-bg');
 
-    // 문제 세트 관련 변수
-    const SET_SIZE = 5; // 한 번에 유지할 문제 개수
-    const MAX_REPEAT = 4; // 한 문제당 반복 노출 횟수
-    const TOTAL_COUNT = 100; // 전체 문제 수
-    let currentSet = [];
-    let shownCount = new Map(); // 각 수식별 노출 횟수
-    let usedExpressions = new Set(); // 이미 출제된 수식
+    let countdown = 5;
+    let countdownAnimFrame = null;
 
-function reset() {
-  count = 0;
-  started = false;
-  startTime = null;
-  clearInterval(intervalId);
-  timerEl.textContent = '00:00.000';
-  counterEl.textContent = '0';
-  expressionEl.style.visibility = 'hidden';
-  messageEl.textContent = '시작하려면 스페이스바를 누르세요';
-  currentSet = [];
-  shownCount = new Map();
-  usedExpressions = new Set();
-  lastExprKey = null;
-  generateInitialSet();
-}
-
-    function randomDigit() {
-      return Math.floor(Math.random() * 9) + 1;
+    function generateAllExpressions() {
+      const exprs = [];
+      for (let a = 1; a <= 9; a++) {
+        for (let b = 1; b <= 9; b++) {
+          if (isAddition || a >= b) {
+            exprs.push({ a, b, op: isAddition ? '+' : '-' });
+          } else {
+            exprs.push({ a: a + 10, b: b, op: '-' });
+          }
+        }
+      }
+      return exprs;
     }
 
-    function generateExpression() {
-      let a = randomDigit();
-      let b = randomDigit();
-      if (!isAddition && a < b) {
-        [a, b] = [b, a];
+    function resetPools() {
+      pool1 = generateAllExpressions();
+      pool2 = [];
+      pool3 = [];
+      for (let i = 0; i < SET_SIZE; i++) {
+        const idx = Math.floor(Math.random() * pool1.length);
+        pool2.push(pool1.splice(idx, 1)[0]);
       }
-      return { a, b, op: isAddition ? '+' : '-' };
+      currentIdx = 0;
+      updatePoolCounts();
+      document.getElementById('center-message').textContent = '시작하려면 스페이스바를 누르세요';
+      document.getElementById('center-message').style.opacity = 1;
+      messageEl.style.display = 'none';
+      expressionEl.textContent = '';
+      expressionEl.style.opacity = 0;
+      choicesEl.innerHTML = '';
+      timerEl.textContent = '00:00.000';
+      count = 0;
+      started = false;
+      startTime = null;
+      clearInterval(intervalId);
+    }
+
+    function updatePoolCounts() {
+      pool1CountEl.textContent = `대기: ${pool1.length}`;
+      pool3CountEl.textContent = `완료: ${pool3.length}`;
     }
 
     function expressionToString(expr) {
       return `${expr.a} ${expr.op} ${expr.b}`;
     }
 
-    function generateUniqueExpression() {
-      let expr, key, tries = 0;
-      do {
-        expr = generateExpression();
-        key = expressionToString(expr);
-        tries++;
-        if (tries > 100) break; // 무한루프 방지
-      } while (usedExpressions.has(key) || currentSet.some(e => expressionToString(e) === key));
-      usedExpressions.add(key);
-      return expr;
-    }
-
-    function generateInitialSet() {
-      for (let i = 0; i < SET_SIZE; i++) {
-        const expr = generateUniqueExpression();
-        currentSet.push(expr);
-        shownCount.set(expressionToString(expr), 0);
+    function showCurrentExpression() {
+      choicesEl.innerHTML = '';
+      document.getElementById('main-content').style.display = '';
+      if (pool2.length === 0) {
+        expressionEl.textContent = '';
+        expressionEl.style.opacity = 0;
+        document.getElementById('center-message').textContent = '모든 문제를 맞췄습니다!';
+        document.getElementById('center-message').style.opacity = 1;
+        messageEl.textContent = '';
+        clearInterval(intervalId);
+        cancelAnimationFrame(countdownAnimFrame);
+        circleBgEl.style.width = '0px';
+        circleBgEl.style.height = '0px';
+        return;
       }
-    }
-
-    let lastExprKey = null;
-    function pickNextExpression() {
-      // 직전과 같은 수식이 나오지 않도록 랜덤 선택
-      if (currentSet.length === 1) {
-        return currentSet[0];
-      }
-      let idx, expr, key, tries = 0;
-      do {
-        idx = Math.floor(Math.random() * currentSet.length);
-        expr = currentSet[idx];
-        key = expressionToString(expr);
-        tries++;
-        if (tries > 20) break; // 무한루프 방지
-      } while (key === lastExprKey);
-      lastExprKey = key;
-      return expr;
-    }
-
-    function updateExpression() {
-      // 다음에 보여줄 수식 선택
-      let expr = pickNextExpression();
+      if (currentIdx >= pool2.length) currentIdx = 0;
+      const expr = pool2[currentIdx];
       expressionEl.textContent = expressionToString(expr);
-      // 노출 횟수 증가
-      const key = expressionToString(expr);
-      shownCount.set(key, shownCount.get(key) + 1);
-      // MAX_REPEAT만큼 노출된 수식은 교체
-      if (shownCount.get(key) >= MAX_REPEAT) {
-        // currentSet에서 제거
-        currentSet = currentSet.filter(e => expressionToString(e) !== key);
-        shownCount.delete(key);
-        // 새 수식 추가 (기존에 없던 것)
-        const newExpr = generateUniqueExpression();
-        currentSet.push(newExpr);
-        shownCount.set(expressionToString(newExpr), 0);
+      expressionEl.style.opacity = 1;
+
+      // 카운트다운 애니메이션 초기화 (배경 동그라미)
+      let startTimeAnim = null;
+      cancelAnimationFrame(countdownAnimFrame);
+      circleBgEl.style.width = '100vw';
+      circleBgEl.style.height = '100vw';
+      circleBgEl.style.left = '50%';
+      circleBgEl.style.top = '50%';
+      circleBgEl.style.transform = 'translate(-50%, -50%)';
+      function animateCircleBg(ts) {
+        if (!startTimeAnim) startTimeAnim = ts;
+        const elapsed = (ts - startTimeAnim) / 1000;
+        const remain = Math.max(0, 5 - elapsed);
+        const size = 100 * remain / 5;
+        circleBgEl.style.width = size + 'vw';
+        circleBgEl.style.height = size + 'vw';
+        if (remain > 0) {
+          countdownAnimFrame = requestAnimationFrame(animateCircleBg);
+        } else {
+          circleBgEl.style.width = '0px';
+          circleBgEl.style.height = '0px';
+          handleChoice(null, expr.op === '+' ? expr.a + expr.b : expr.a - expr.b, expr, true);
+        }
       }
+      countdownAnimFrame = requestAnimationFrame(animateCircleBg);
+
+      // 보기 3개 생성
+      const answer = expr.op === '+' ? expr.a + expr.b : expr.a - expr.b;
+      const wrongs = [];
+      while (wrongs.length < 2) {
+        let w = answer + (Math.floor(Math.random() * 5) + 1) * (Math.random() > 0.5 ? 1 : -1);
+        if (w !== answer && w >= 0 && !wrongs.includes(w)) wrongs.push(w);
+      }
+      const choices = [answer, ...wrongs].sort(() => Math.random() - 0.5);
+
+      choices.forEach(val => {
+        const btn = document.createElement('button');
+        btn.textContent = val;
+        btn.style.minWidth = '4em';
+        btn.style.fontSize = '2em';
+        btn.style.padding = '1em';
+        btn.style.margin = '0 0.5em';
+        btn.onclick = () => handleChoice(val, answer, expr);
+        choicesEl.appendChild(btn);
+      });
+      updatePoolCounts();
+    }
+
+    function handleChoice(selected, answer, expr, isTimeout = false) {
+      if (!started) return;
+      cancelAnimationFrame(countdownAnimFrame);
+      let correct = selected === answer;
+      if (isTimeout) correct = false;
+      // 메시지 숨김 코드 제거 (항상 표시)
+      if (correct) {
+        const key = expressionToString(expr);
+        if (!pool3.some(e => expressionToString(e) === key)) {
+          pool3.push(expr);
+        }
+        if (pool3.filter(e => expressionToString(e) === key).length > 1) {
+          pool2.splice(currentIdx, 1);
+        }
+        if (pool3.some(e => expressionToString(e) === key)) {
+          pool2 = pool2.filter(e => expressionToString(e) !== key);
+        }
+        if (pool2.length < SET_SIZE && pool1.length > 0) {
+          const idx = Math.floor(Math.random() * pool1.length);
+          pool2.push(pool1.splice(idx, 1)[0]);
+        }
+        document.getElementById('center-message').textContent = '정답!';
+        document.getElementById('center-message').style.opacity = 1;
+      } else {
+        document.getElementById('center-message').textContent = isTimeout ? '시간초과! 오답!' : '오답!';
+        document.getElementById('center-message').style.opacity = 1;
+      }
+      currentIdx = (currentIdx + 1) % (pool2.length || 1);
+      showCurrentExpression();
+      updatePoolCounts();
     }
 
     function updateTimer() {
@@ -187,50 +302,57 @@ function reset() {
       timerEl.textContent = `${minutes}:${seconds}.${milliseconds}`;
     }
 
-toggleBtn.addEventListener('click', () => {
-  isAddition = !isAddition;
-  toggleBtn.textContent = isAddition ? '+' : '-';
-  lastExprKey = null;
-  reset();
-});
-
-    function handleAction() {
-      if (!started) {
-        started = true;
-        startTime = Date.now();
-        intervalId = setInterval(updateTimer, 31);
-        expressionEl.style.visibility = 'visible';
-        messageEl.textContent = '';
-        updateExpression();
-        return;
-      }
-
-      if (count < TOTAL_COUNT) {
-        count++;
-        counterEl.textContent = count;
-        updateExpression();
-        if (count === TOTAL_COUNT) {
-          clearInterval(intervalId);
-        }
-      }
-    }
+    toggleBtn.addEventListener('click', () => {
+      isAddition = !isAddition;
+      toggleBtn.textContent = isAddition ? '+' : '-';
+      resetPools();
+      showCurrentExpression();
+    });
 
     document.addEventListener('keydown', (e) => {
       if (e.code === 'Space') {
         e.preventDefault();
-        handleAction();
+        if (!started) {
+          started = true;
+          startTime = Date.now();
+          intervalId = setInterval(updateTimer, 31);
+          messageEl.style.display = '';
+          document.getElementById('center-message').textContent = '';
+          // 첫 시작 시 main-content와 동그라미 표시
+          document.getElementById('main-content').style.display = '';
+          circleBgEl.style.width = '100vw';
+          circleBgEl.style.height = '100vw';
+          showCurrentExpression();
+          return;
+        }
+        showCurrentExpression();
       }
     });
 
-// 클릭 이벤트에서 토글 버튼 클릭은 무시
-document.addEventListener('click', (e) => {
-  // 토글 버튼 클릭 시에는 handleAction 실행하지 않음
-  if (e.target === toggleBtn) return;
-  handleAction();
-});
+    // 첫 화면에서 마우스 클릭으로도 시작되도록 이벤트 추가
+    if (!window._centerStartClickAdded) {
+      window._centerStartClickAdded = true;
+      document.addEventListener('click', (e) => {
+        if (!started && e.target !== toggleBtn) {
+          started = true;
+          startTime = Date.now();
+          intervalId = setInterval(updateTimer, 31);
+          messageEl.style.display = 'none';
+          document.getElementById('center-message').textContent = '';
+          document.getElementById('main-content').style.display = '';
+          circleBgEl.style.width = '100vw';
+          circleBgEl.style.height = '100vw';
+          showCurrentExpression();
+        }
+      });
+    }
 
     // 초기 설정
-    reset();
+    resetPools();
+    document.getElementById('main-content').style.display = '';
+    circleBgEl.style.width = '0vw';
+    circleBgEl.style.height = '0vw';
+    messageEl.textContent = '시작하려면 스페이스바를 누르세요';
   </script>
 </body>
 </html>
