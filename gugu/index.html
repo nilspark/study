@@ -1,0 +1,324 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <title>덧셈/뺄셈 트레이너</title>
+  <style>
+    * {
+      box-sizing: border-box;
+    }
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background: linear-gradient(to bottom, #f7f8fc, #e4e9f0);
+      min-height: 100vh;
+      width: 100vw;
+      margin: 0;
+      padding: 0;
+      color: #333;
+    }
+    .center-container {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 100%;
+    }
+    .top-bar {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      gap: 2em;
+      font-size: 1.5em;
+      margin-bottom: 1em;
+    }
+    .top-bar button {
+      font-size: 1em;
+      padding: 0.4em 1em;
+      border: none;
+      border-radius: 8px;
+      background-color: #4a90e2;
+      color: white;
+      cursor: pointer;
+      transition: background-color 0.2s;
+      height: 48px;
+      min-width: 48px;
+      line-height: 1.2;
+    }
+    .top-bar button:hover {
+      background-color: #357ab8;
+    }
+    #timer, #counter {
+      padding: 0.4em 1em;
+      background-color: white;
+      border-radius: 8px;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.1);
+      min-width: 120px;
+      font-size: 1em;
+      text-align: center;
+      margin: 0 0.5em;
+      height: 48px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .pool-count-box {
+      background: #fff;
+      border-radius: 8px;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.1);
+      min-width: 180px;
+      padding: 0.4em 1em;
+      font-size: 1em;
+      text-align: center;
+      margin: 0 0.5em;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      height: 48px;
+    }
+    .expression {
+      font-size: 8em;
+      font-weight: bold;
+      color: #222;
+      margin: 1em 0;
+      min-height: 1em;
+      transition: opacity 0.2s;
+      opacity: 1;
+    }
+    .message {
+      font-size: 1.5em;
+      color: #888;
+      margin-top: 1em;
+      text-align: center;
+    }
+    #center-message {
+      text-align: center;
+      font-size: 2em;
+      color: #357ab8;
+      margin-top: 0.em;
+      min-height: 1.5em;
+      transition: opacity 0.2s;
+      opacity: 1;
+    }
+  </style>
+</head>
+<body style="margin:0; padding:0; min-height:100vh;">
+  <div id="circle-bg" style="position: fixed; left: 50%; top: 50%; transform: translate(-50%, -50%); background: #b3d4fc; border-radius: 50%; z-index: -1; width: 0vw; height: 0vw; pointer-events: none; transition: width 0s, height 0s;"></div>
+  <div id="main-content" style="display:none;">
+    <div class="center-container" style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 100%; max-width: 700px;">
+      <div class="top-bar">
+        <div id="timer">00:00.000</div>
+        <div id="pool-counts" style="display: flex; gap: 2em; justify-content: center;">
+          <div id="pool1-count" class="pool-count-box">대기: 0</div>
+          <div id="pool3-count" class="pool-count-box">완료: 0</div>
+        </div>
+      </div>
+      <div class="center-flex" style="display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 320px; gap: 0.5em;">
+        <div class="expression" id="expression" style="visibility: visible; min-height: 1em;">1 + 2</div>
+        <div id="center-message" style="text-align:center; font-size:2em; color:#357ab8; min-height: 1.5em;"></div>
+      </div>
+      <div id="choices" style="display: flex; justify-content: center; gap: 2em; margin: 2em 0;"></div>
+    </div>
+  </div>
+  <div class="message" id="message" style="text-align:center; font-size:1.5em; color:#888; margin-top:1em;">시작하려면 스페이스바를 누르세요</div>
+
+  <script>
+    // 3개의 풀
+    const SET_SIZE = 5;
+    let count = 0;
+    let startTime = null;
+    let intervalId = null;
+    let started = false;
+    let pool1 = [];
+    let pool2 = [];
+    let pool3 = [];
+    let currentIdx = 0;
+
+    const expressionEl = document.getElementById('expression');
+    const timerEl = document.getElementById('timer');
+    const pool1CountEl = document.getElementById('pool1-count');
+    const pool3CountEl = document.getElementById('pool3-count');
+    const messageEl = document.getElementById('message');
+    const choicesEl = document.getElementById('choices');
+    const circleBgEl = document.getElementById('circle-bg');
+
+    let countdown = 5;
+    let countdownAnimFrame = null;
+
+    function generateAllExpressions() {
+      const exprs = [];
+      for (let a = 2; a <= 9; a++) {
+        for (let b = 1; b <= 9; b++) {
+          exprs.push({ a, b, op: '×' });
+        }
+      }
+      return exprs;
+    }
+
+    function resetPools() {
+      pool1 = generateAllExpressions();
+      pool2 = [];
+      pool3 = [];
+      for (let i = 0; i < SET_SIZE; i++) {
+        const idx = Math.floor(Math.random() * pool1.length);
+        pool2.push(pool1.splice(idx, 1)[0]);
+      }
+      currentIdx = 0;
+      updatePoolCounts();
+      document.getElementById('center-message').textContent = '시작하려면 스페이스바를 누르세요';
+      document.getElementById('center-message').style.opacity = 1;
+      messageEl.style.display = 'none';
+      expressionEl.textContent = '';
+      expressionEl.style.opacity = 0;
+      choicesEl.innerHTML = '';
+      timerEl.textContent = '00:00.000';
+      count = 0;
+      started = false;
+      startTime = null;
+      clearInterval(intervalId);
+    }
+
+    function updatePoolCounts() {
+      pool1CountEl.textContent = `대기: ${pool1.length}`;
+      pool3CountEl.textContent = `완료: ${pool3.length}`;
+    }
+
+    function expressionToString(expr) {
+  return `${expr.a} ${expr.op} ${expr.b}`;
+    }
+
+    function showCurrentExpression() {
+      choicesEl.innerHTML = '';
+      document.getElementById('main-content').style.display = '';
+      if (pool2.length === 0) {
+        expressionEl.textContent = '';
+        expressionEl.style.opacity = 0;
+        document.getElementById('center-message').textContent = '모든 문제를 맞췄습니다!';
+        document.getElementById('center-message').style.opacity = 1;
+        messageEl.textContent = '';
+        clearInterval(intervalId);
+        cancelAnimationFrame(countdownAnimFrame);
+        circleBgEl.style.width = '0px';
+        circleBgEl.style.height = '0px';
+        return;
+      }
+      if (currentIdx >= pool2.length) currentIdx = 0;
+      const expr = pool2[currentIdx];
+      expressionEl.textContent = expressionToString(expr);
+      expressionEl.style.opacity = 1;
+
+  // 카운트다운 동그라미 및 타임아웃 제거
+  circleBgEl.style.width = '0px';
+  circleBgEl.style.height = '0px';
+
+      // 보기 3개 생성
+      const answer = expr.a * expr.b;
+      const wrongs = [];
+      while (wrongs.length < 2) {
+        let w = answer + (Math.floor(Math.random() * 5) + 1) * (Math.random() > 0.5 ? 1 : -1);
+        if (w !== answer && w > 0 && !wrongs.includes(w)) wrongs.push(w);
+      }
+      const choices = [answer, ...wrongs].sort(() => Math.random() - 0.5);
+
+      choices.forEach(val => {
+        const btn = document.createElement('button');
+        btn.textContent = val;
+        btn.style.minWidth = '4em';
+        btn.style.fontSize = '2em';
+        btn.style.padding = '1em';
+        btn.style.margin = '0 0.5em';
+        btn.onclick = () => handleChoice(val, answer, expr);
+        choicesEl.appendChild(btn);
+      });
+      updatePoolCounts();
+    }
+
+    function handleChoice(selected, answer, expr, isTimeout = false) {
+      if (!started) return;
+  let correct = selected === answer;
+      if (correct) {
+        const key = expressionToString(expr);
+        if (!pool3.some(e => expressionToString(e) === key)) {
+          pool3.push(expr);
+        }
+        if (pool3.filter(e => expressionToString(e) === key).length > 1) {
+          pool2.splice(currentIdx, 1);
+        }
+        if (pool3.some(e => expressionToString(e) === key)) {
+          pool2 = pool2.filter(e => expressionToString(e) !== key);
+        }
+        if (pool2.length < SET_SIZE && pool1.length > 0) {
+          const idx = Math.floor(Math.random() * pool1.length);
+          pool2.push(pool1.splice(idx, 1)[0]);
+        }
+        document.getElementById('center-message').textContent = '정답!';
+        document.getElementById('center-message').style.opacity = 1;
+      } else {
+        document.getElementById('center-message').textContent = isTimeout ? '시간초과! 오답!' : '오답!';
+        document.getElementById('center-message').style.opacity = 1;
+      }
+      currentIdx = (currentIdx + 1) % (pool2.length || 1);
+      showCurrentExpression();
+      updatePoolCounts();
+    }
+
+    function updateTimer() {
+      if (!started || startTime === null) return;
+      const now = Date.now();
+      const elapsed = now - startTime;
+      const minutes = String(Math.floor(elapsed / 60000)).padStart(2, '0');
+      const seconds = String(Math.floor((elapsed % 60000) / 1000)).padStart(2, '0');
+      const milliseconds = String(elapsed % 1000).padStart(3, '0');
+      timerEl.textContent = `${minutes}:${seconds}.${milliseconds}`;
+    }
+
+  // + - 토글 버튼 제거됨
+
+    document.addEventListener('keydown', (e) => {
+      if (e.code === 'Space') {
+        e.preventDefault();
+        if (!started) {
+          started = true;
+          startTime = Date.now();
+          intervalId = setInterval(updateTimer, 31);
+          messageEl.style.display = '';
+          document.getElementById('center-message').textContent = '';
+          // 첫 시작 시 main-content와 동그라미 표시
+          document.getElementById('main-content').style.display = '';
+          circleBgEl.style.width = '100vw';
+          circleBgEl.style.height = '100vw';
+          showCurrentExpression();
+          return;
+        }
+        showCurrentExpression();
+      }
+    });
+
+    // 첫 화면에서 마우스 클릭 또는 터치로도 시작되도록 이벤트 추가
+    if (!window._centerStartInputAdded) {
+      window._centerStartInputAdded = true;
+      function startIfNotStarted(e) {
+        if (!started) {
+          started = true;
+          startTime = Date.now();
+          intervalId = setInterval(updateTimer, 31);
+          messageEl.style.display = 'none';
+          document.getElementById('center-message').textContent = '';
+          document.getElementById('main-content').style.display = '';
+          circleBgEl.style.width = '0vw';
+          circleBgEl.style.height = '0vw';
+          showCurrentExpression();
+        }
+      }
+      document.addEventListener('click', startIfNotStarted);
+      document.addEventListener('touchstart', startIfNotStarted);
+    }
+
+    // 초기 설정
+    resetPools();
+    document.getElementById('main-content').style.display = '';
+    circleBgEl.style.width = '0vw';
+    circleBgEl.style.height = '0vw';
+    messageEl.textContent = '시작하려면 스페이스바를 누르세요';
+  </script>
+</body>
+</html>
