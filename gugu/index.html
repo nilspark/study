@@ -112,6 +112,7 @@
           <div id="pool3-count" class="pool-count-box">완료: 0</div>
         </div>
       </div>
+      <div id="debug-pool2" style="width:100%; margin-bottom:1em; font-size:1em; color:#888; text-align:left;"></div>
       <div class="center-flex" style="display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 320px; gap: 0.5em;">
         <div class="expression" id="expression" style="visibility: visible; min-height: 1em;">1 + 2</div>
         <div id="center-message" style="text-align:center; font-size:2em; color:#357ab8; min-height: 1.5em;"></div>
@@ -155,7 +156,7 @@
     }
 
     function resetPools() {
-      pool1 = generateAllExpressions();
+      pool1 = generateAllExpressions().map(expr => ({ ...expr, wrongCount: 0 }));
       pool2 = [];
       pool3 = [];
       for (let i = 0; i < SET_SIZE; i++) {
@@ -178,8 +179,11 @@
     }
 
     function updatePoolCounts() {
-      pool1CountEl.textContent = `대기: ${pool1.length}`;
+      pool1CountEl.textContent = `대기: ${pool1.length + pool2.length}`;
       pool3CountEl.textContent = `완료: ${pool3.length}`;
+      // 디버그: 출제 풀(pool2) 문제와 오답카운트 표시
+      const debugEl = document.getElementById('debug-pool2');
+      debugEl.innerHTML = pool2.map(e => `${expressionToString(e)} <span style='color:#c00'>(${e.wrongCount||0})</span>`).join(', ');
     }
 
     function expressionToString(expr) {
@@ -226,38 +230,50 @@
         btn.style.fontSize = '2em';
         btn.style.padding = '1em';
         btn.style.margin = '0 0.5em';
-        btn.onclick = () => handleChoice(val, answer, expr);
+        btn.classList.add('choice-btn');
+        btn.onclick = () => handleChoice(val, answer, expr, btn);
         choicesEl.appendChild(btn);
       });
       updatePoolCounts();
     }
 
-    function handleChoice(selected, answer, expr, isTimeout = false) {
+    function handleChoice(selected, answer, expr, btn, isTimeout = false) {
       if (!started) return;
-  let correct = selected === answer;
+      let correct = selected === answer;
       if (correct) {
+        // 정답 시 오답 카운트 감소
+        if (typeof expr.wrongCount === 'number' && expr.wrongCount > 0) {
+          expr.wrongCount--;
+        } else if (expr.wrongCount === 0) {
+          expr.wrongCount = -1;
+        }
         const key = expressionToString(expr);
-        if (!pool3.some(e => expressionToString(e) === key)) {
-          pool3.push(expr);
-        }
-        if (pool3.filter(e => expressionToString(e) === key).length > 1) {
-          pool2.splice(currentIdx, 1);
-        }
-        if (pool3.some(e => expressionToString(e) === key)) {
+        // 오답 카운트가 -1이 되면 pool2에서 제거
+        if (expr.wrongCount === -1) {
           pool2 = pool2.filter(e => expressionToString(e) !== key);
         }
+        // pool2가 부족하면 pool1에서 추가
         if (pool2.length < SET_SIZE && pool1.length > 0) {
           const idx = Math.floor(Math.random() * pool1.length);
           pool2.push(pool1.splice(idx, 1)[0]);
         }
         document.getElementById('center-message').textContent = '정답!';
         document.getElementById('center-message').style.opacity = 1;
+        currentIdx = (currentIdx + 1) % (pool2.length || 1);
+        showCurrentExpression();
       } else {
-        document.getElementById('center-message').textContent = isTimeout ? '시간초과! 오답!' : '오답!';
+        // 오답 시 오답 카운트 증가
+        if (typeof expr.wrongCount === 'number') {
+          expr.wrongCount++;
+        } else {
+          expr.wrongCount = 1;
+        }
+        if (btn) {
+          btn.disabled = true;
+        }
+        document.getElementById('center-message').textContent = '오답! 다시 선택하세요';
         document.getElementById('center-message').style.opacity = 1;
       }
-      currentIdx = (currentIdx + 1) % (pool2.length || 1);
-      showCurrentExpression();
       updatePoolCounts();
     }
 
