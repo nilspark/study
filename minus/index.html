@@ -2,11 +2,9 @@
 <html lang="ko">
 <head>
   <meta charset="UTF-8">
-  <title>덧셈/뺄셈 트레이너</title>
+  <title>뺄셈 트레이너</title>
   <style>
-    * {
-      box-sizing: border-box;
-    }
+    * { box-sizing: border-box; }
     body {
       font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
       background: linear-gradient(to bottom, #f7f8fc, #e4e9f0);
@@ -38,22 +36,6 @@
       gap: 2em;
       font-size: 1.5em;
       margin-bottom: 1em;
-    }
-    .top-bar button {
-      font-size: 1em;
-      padding: 0.4em 1em;
-      border: none;
-      border-radius: 8px;
-      background-color: #4a90e2;
-      color: white;
-      cursor: pointer;
-      transition: background-color 0.2s;
-      height: 48px;
-      min-width: 48px;
-      line-height: 1.2;
-    }
-    .top-bar button:hover {
-      background-color: #357ab8;
     }
     #timer, #counter {
       padding: 0.4em 1em;
@@ -122,7 +104,7 @@
       </div>
       <div id="debug-pool2" style="width:100%; margin-bottom:1em; font-size:1em; color:#888; text-align:left;"></div>
       <div class="center-flex" style="display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 320px; gap: 0.5em;">
-        <div class="expression" id="expression" style="visibility: visible; min-height: 1em;">1 + 2</div>
+        <div class="expression" id="expression" style="visibility: visible; min-height: 1em;">18 - 9</div>
         <div id="center-message" style="text-align:center; font-size:2em; color:#357ab8; min-height: 1.5em;"></div>
       </div>
       <div id="choices" style="display: flex; justify-content: center; gap: 2em; margin: 2em 0;"></div>
@@ -150,15 +132,13 @@
     const choicesEl = document.getElementById('choices');
     const circleBgEl = document.getElementById('circle-bg');
 
-    let countdown = 5;
-    let countdownAnimFrame = null;
-
-    // 수식 생성부분
+    // 수식 생성부분 (0-0 ~ 18-9, 결과가 0~9만 나오도록)
     function generateAllExpressions() {
       const exprs = [];
-      for (let a = 2; a <= 9; a++) {
-        for (let b = 1; b <= 9; b++) {
-          exprs.push({ a, b, op: '×' }); // 곱셈. 덧셈/뺄셈으로 변경 가능
+      for (let a = 0; a <= 18; a++) {
+        // b의 시작값: max(0, a-9), 끝값: min(9, a)
+        for (let b = Math.max(0, a-9); b <= Math.min(9, a); b++) {
+          exprs.push({ a, b, op: '-' });
         }
       }
       return exprs;
@@ -196,7 +176,7 @@
     }
 
     function expressionToString(expr) {
-  return `${expr.a} ${expr.op} ${expr.b}`;
+      return `${expr.a} ${expr.op} ${expr.b}`;
     }
 
     function showCurrentExpression() {
@@ -209,7 +189,6 @@
         document.getElementById('center-message').style.opacity = 1;
         messageEl.textContent = '';
         clearInterval(intervalId);
-        cancelAnimationFrame(countdownAnimFrame);
         circleBgEl.style.width = '0px';
         circleBgEl.style.height = '0px';
         return;
@@ -218,20 +197,16 @@
       const expr = pool2[currentIdx];
       expressionEl.textContent = expressionToString(expr);
       expressionEl.style.opacity = 1;
-
-  // 카운트다운 동그라미 및 타임아웃 제거
-  circleBgEl.style.width = '0px';
-  circleBgEl.style.height = '0px';
-
+      circleBgEl.style.width = '0px';
+      circleBgEl.style.height = '0px';
       // 보기 3개 생성
-      const answer = expr.a * expr.b;
+      const answer = expr.a - expr.b;
       const wrongs = [];
       while (wrongs.length < 2) {
         let w = answer + (Math.floor(Math.random() * 5) + 1) * (Math.random() > 0.5 ? 1 : -1);
-        if (w !== answer && w > 0 && !wrongs.includes(w)) wrongs.push(w);
+        if (w !== answer && !wrongs.includes(w)) wrongs.push(w);
       }
       const choices = [answer, ...wrongs].sort(() => Math.random() - 0.5);
-
       choices.forEach(val => {
         const btn = document.createElement('button');
         btn.textContent = val;
@@ -248,9 +223,9 @@
 
     // 응답 정답 확인 부분
     function isCorrect(selected, expr) {
-      if (expr.op === '×') return selected === expr.a * expr.b;
-      if (expr.op === '+') return selected === expr.a + expr.b;
       if (expr.op === '-') return selected === expr.a - expr.b;
+      if (expr.op === '+') return selected === expr.a + expr.b;
+      if (expr.op === '×') return selected === expr.a * expr.b;
       return false;
     }
 
@@ -309,26 +284,6 @@
       const milliseconds = String(elapsed % 1000).padStart(3, '0');
       timerEl.textContent = `${minutes}:${seconds}.${milliseconds}`;
     }
-
-  // 스페이스바로 시작하는 기능 제거
-    // document.addEventListener('keydown', (e) => {
-    //   if (e.code === 'Space') {
-    //     e.preventDefault();
-    //     if (!started) {
-    //       started = true;
-    //       startTime = Date.now();
-    //       intervalId = setInterval(updateTimer, 31);
-    //       messageEl.style.display = 'none';
-    //       document.getElementById('center-message').textContent = '';
-    //       document.getElementById('main-content').style.display = '';
-    //       circleBgEl.style.width = '0vw';
-    //       circleBgEl.style.height = '0vw';
-    //       showCurrentExpression();
-    //       return;
-    //     }
-    //     showCurrentExpression();
-    //   }
-    // });
 
     // 터치/클릭으로만 시작
     if (!window._centerStartInputAdded) {
