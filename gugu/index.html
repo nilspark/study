@@ -130,6 +130,7 @@
   </div>
   <div class="message" id="message" style="text-align:center; font-size:1.5em; color:#888; margin-top:1em;">시작하려면 화면을 터치하세요</div>
 
+  <script src="../shared/trainer-core.js"></script>
   <script>
     // 3개의 풀
     const SET_SIZE = 5;
@@ -188,11 +189,8 @@
     }
 
     function updatePoolCounts() {
-      pool1CountEl.textContent = `대기: ${pool1.length + pool2.length}`;
-      pool3CountEl.textContent = `완료: ${pool3.length}`;
-      // 디버그: 출제 풀(pool2) 문제와 오답카운트 표시
       const debugEl = document.getElementById('debug-pool2');
-      debugEl.innerHTML = pool2.map(e => `${expressionToString(e)} <span style='color:#c00'>(${e.wrongCount||0})</span>`).join(', ');
+      updatePoolCountsGeneric(pool1, pool2, pool3, pool1CountEl, pool3CountEl, debugEl, expressionToString);
     }
 
     function expressionToString(expr) {
@@ -256,19 +254,7 @@
 
     // 정답 처리
     function processCorrect(expr) {
-      if (typeof expr.wrongCount === 'number' && expr.wrongCount > 0) {
-        expr.wrongCount--;
-      } else if (expr.wrongCount === 0) {
-        expr.wrongCount = -1;
-      }
-      const key = expressionToString(expr);
-      if (expr.wrongCount === -1) {
-        pool2 = pool2.filter(e => expressionToString(e) !== key);
-      }
-      if (pool2.length < SET_SIZE && pool1.length > 0) {
-        const idx = Math.floor(Math.random() * pool1.length);
-        pool2.push(pool1.splice(idx, 1)[0]);
-      }
+      processCorrectGeneric(expr, pool1, pool2, pool3, SET_SIZE, expressionToString);
       document.getElementById('center-message').textContent = '정답!';
       document.getElementById('center-message').style.opacity = 1;
       currentIdx = (currentIdx + 1) % (pool2.length || 1);
@@ -277,14 +263,7 @@
 
     // 오답 처리
     function processWrong(expr, btn) {
-      if (typeof expr.wrongCount === 'number') {
-        expr.wrongCount++;
-      } else {
-        expr.wrongCount = 1;
-      }
-      if (btn) {
-        btn.disabled = true;
-      }
+      processWrongGeneric(expr, btn);
       document.getElementById('center-message').textContent = '오답! 다시 선택하세요';
       document.getElementById('center-message').style.opacity = 1;
     }
@@ -370,5 +349,6 @@
     circleBgEl.style.height = '0vw';
     messageEl.textContent = '시작하려면 화면을 터치하세요';
   </script>
+  <script src="../shared/trainer-app.js"></script>
 </body>
 </html>
